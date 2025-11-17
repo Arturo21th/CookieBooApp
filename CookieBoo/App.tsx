@@ -1,10 +1,13 @@
 import React from 'react';
 import {
-  ScrollView,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  Pressable,
   StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
   useColorScheme,
   View,
 } from 'react-native';
@@ -13,509 +16,755 @@ import {
   SafeAreaView,
 } from 'react-native-safe-area-context';
 
-type Palette = {
-  background: string;
-  cardPrimary: string;
-  cardSecondary: string;
-  accent: string;
-  accentMuted: string;
-  textPrimary: string;
-  textMuted: string;
-  border: string;
-  highlight: string;
-  shadow: string;
+const Colors = {
+  white: '#ffffff',
+  black: '#0f172a',
+  light: '#a7d8ff',
+  dark: '#1f2933',
+  darker: '#080b12',
+  lighter: '#f7f3ef',
 };
 
-const lightPalette: Palette = {
-  background: '#FFFDF8',
-  cardPrimary: '#F6EDE3',
-  cardSecondary: '#FFFFFF',
-  accent: '#FF9B6A',
-  accentMuted: '#FFE1D1',
-  textPrimary: '#1C150F',
-  textMuted: '#6A5D52',
-  border: '#F0E6DC',
-  highlight: '#FDEEE3',
-  shadow: 'rgba(28, 21, 15, 0.15)',
+const defaultProfile = {
+  tier: 'Cliente Cookie Lover',
+  totalScans: 8,
+  completedScans: 3,
 };
 
-const darkPalette: Palette = {
-  background: '#090606',
-  cardPrimary: '#1F1410',
-  cardSecondary: '#130C0A',
-  accent: '#FFAE7A',
-  accentMuted: '#3B1E13',
-  textPrimary: '#F9F3ED',
-  textMuted: '#B7ADA4',
-  border: '#2E211D',
-  highlight: '#2A1A14',
-  shadow: '#000000',
+const logoUri =
+  'https://images.unsplash.com/photo-1517686469429-8bdb88b9f907?auto=format&w=120&q=80';
+
+const settingsIconUri =
+  'https://img.icons8.com/ios-filled/100/ffffff/settings.png';
+
+const qrIconUri = 'https://img.icons8.com/ios-filled/100/ffffff/qr-code.png';
+const cardIconUri =
+  'https://img.icons8.com/ios-filled/100/ffffff/bank-card-back-side.png';
+const chatIconUri =
+  'https://img.icons8.com/ios-filled/100/ffffff/filled-chat.png';
+
+const getQrUri = (userId: string) =>
+  `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(
+    userId,
+  )}`;
+
+const formatDate = (value?: Date | string) => {
+  if (!value) {
+    return null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
-const featuredCookies = [
+type SettingsOption = {
+  id: string;
+  label: string;
+  icon: string;
+};
+
+const settingsOptions: SettingsOption[] = [
   {
-    id: 'midnight',
-    icon: '🌙',
-    name: 'Midnight Sea Salt',
-    tagline: '72% cacao, maldon crunch',
-    rating: '4.9',
-    badge: 'Chef favorite',
-    detail: 'Fermented dough • 18h rest',
+    id: 'update-name',
+    label: 'Actualizar tu nombre',
+    icon: 'https://img.icons8.com/ios-filled/50/1f2933/edit-user.png',
   },
   {
-    id: 'cereal',
-    icon: '🥣',
-    name: 'Cereal Milk Crunch',
-    tagline: 'Toasted cornflake praline',
-    rating: '4.7',
-    badge: 'Limited drop',
-    detail: 'Sweet-salty glaze • Hand-piped',
+    id: 'change-password',
+    label: 'Cambiar contraseña',
+    icon: 'https://img.icons8.com/ios-filled/50/1f2933/password1.png',
   },
   {
-    id: 'rose',
-    icon: '🌸',
-    name: 'Rose Pistachio Bloom',
-    tagline: 'Vegan tahini butter',
-    rating: '5.0',
-    badge: 'Plant-based',
-    detail: 'Cardamom sugar • Gold dust',
+    id: 'help',
+    label: 'Ayuda',
+    icon: 'https://img.icons8.com/ios-filled/50/1f2933/help.png',
+  },
+  {
+    id: 'scan',
+    label: 'Escanear código QR',
+    icon: 'https://img.icons8.com/ios-filled/50/1f2933/qr-code.png',
+  },
+  {
+    id: 'admin-roles',
+    label: 'Administrar roles',
+    icon: 'https://img.icons8.com/ios-filled/50/1f2933/conference-call.png',
+  },
+  {
+    id: 'admin-message',
+    label: 'Enviar mensaje',
+    icon: 'https://img.icons8.com/ios-filled/50/1f2933/filled-message.png',
+  },
+  {
+    id: 'admin-stamps',
+    label: 'Consultar sellos',
+    icon: 'https://img.icons8.com/ios-filled/50/1f2933/stamp.png',
+  },
+  {
+    id: 'logout',
+    label: 'Cerrar sesión',
+    icon: 'https://img.icons8.com/ios-filled/50/1f2933/logout-rounded-left.png',
+  },
+  {
+    id: 'delete-account',
+    label: 'Eliminar cuenta',
+    icon: 'https://img.icons8.com/ios-filled/50/1f2933/delete-forever.png',
   },
 ];
 
-const kitchenEvents = [
+const messagesMock = [
   {
-    id: 'proof',
-    time: '08:00',
-    title: 'Dough cold-proof',
-    detail: 'Starter activated overnight with brown butter.',
+    id: 'msg-1',
+    title: 'Nuevo drop de media noche',
+    body: 'Reserva tus Midnight Sea Salt antes de las 6 pm y recibe un latte gratis.',
+    createdAt: new Date(),
   },
   {
-    id: 'bake',
-    time: '11:15',
-    title: 'First bake window',
-    detail: 'Stone deck set to 320ºC for caramel edges.',
-  },
-  {
-    id: 'drop',
-    time: '15:30',
-    title: 'Neighborhood drop',
-    detail: 'Courier bikes deliver in insulated cookie totes.',
+    id: 'msg-2',
+    title: 'Envíos fríos disponibles',
+    body: 'Ahora llegamos a Monterrey y Guadalajara con empaque térmico.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12),
   },
 ];
 
-const memberships = [
-  {
-    id: 'glow',
-    title: 'Glow Box',
-    detail: '6 seasonal flavors curated by CookieBoo chefs.',
-    shipping: 'Friday pickups + cold ship to 20 cities.',
-  },
-  {
-    id: 'midnight',
-    title: 'Midnight Pantry',
-    detail: 'Emergency cookie stash with reheat instructions.',
-    shipping: 'Delivered monthly in reusable tins.',
-  },
-];
-
-const kitchenStats = [
-  { id: 'batches', value: '24', label: 'Small batches', detail: 'Mixed this morning' },
-  { id: 'orders', value: '420+', label: 'Community orders', detail: 'This week' },
-  { id: 'score', value: '4.9★', label: 'Tasting score', detail: 'Based on 320 reviews' },
-];
-
-function App() {
+function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
-  const palette = isDarkMode ? darkPalette : lightPalette;
+  const accent = isDarkMode ? Colors.light : '#63aee0';
+  const [tab, setTab] = React.useState<'qr' | 'card' | 'messages'>('qr');
+  const [settingsVisible, setSettingsVisible] = React.useState(false);
+  const [loading] = React.useState(false);
+  const [error] = React.useState<string | null>(null);
+  const messages = messagesMock;
+
+  const totalScans = defaultProfile.totalScans;
+  const completedScans = defaultProfile.completedScans;
+  const stampItems = React.useMemo(
+    () =>
+      Array.from({length: totalScans}, (_, index) => ({
+        id: index,
+        filled: index < completedScans,
+      })),
+    [totalScans, completedScans],
+  );
+  const lastScanLabel = formatDate('2024-05-01T10:30:00Z');
 
   return (
     <SafeAreaProvider>
       <StatusBar
-        translucent
-        backgroundColor="transparent"
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor="transparent"
+        translucent
       />
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: palette.background }]}>
-        <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={styles.scrollContent}
-        >
-          <HeroSection palette={palette} />
-          <StatsSection palette={palette} />
-          <FeaturedCookiesSection palette={palette} />
-          <KitchenTimelineSection palette={palette} />
-          <MembershipSection palette={palette} />
-          <CTASection palette={palette} />
-        </ScrollView>
-      </SafeAreaView>
+      <View
+        style={[
+          styles.background,
+          {backgroundColor: isDarkMode ? Colors.darker : Colors.lighter},
+        ]}>
+        <SafeAreaView
+          style={[
+            styles.screen,
+            {backgroundColor: isDarkMode ? Colors.darker : Colors.lighter},
+          ]}>
+        <View style={styles.header}>
+          <View style={styles.profile}>
+            <Image
+              accessibilityLabel="Avatar CookieBoo"
+              source={{uri: logoUri}}
+              style={styles.avatar}
+            />
+            <View style={styles.profileInfo}>
+              <Text
+                style={[
+                  styles.username,
+                  {color: isDarkMode ? Colors.white : Colors.black},
+                ]}>
+                ¡Hola, Cookie Lover!
+              </Text>
+              <Text
+                style={[
+                  styles.tier,
+                  {color: isDarkMode ? Colors.light : Colors.dark},
+                ]}>
+                {defaultProfile.tier}
+              </Text>
+            </View>
+          </View>
+          <Pressable
+            accessibilityLabel="Abrir ajustes"
+            onPress={() => setSettingsVisible(true)}
+            style={styles.settingsButton}>
+            <Image
+              source={{uri: settingsIconUri}}
+              style={[styles.settingsIcon, {tintColor: '#000000'}]}
+            />
+          </Pressable>
+        </View>
+
+        <View style={styles.content}>
+          {error ? (
+            <View
+              style={[
+                styles.errorBox,
+                {backgroundColor: isDarkMode ? Colors.black : '#fee2e2'},
+              ]}>
+              <Text
+                style={[
+                  styles.errorText,
+                  {color: isDarkMode ? Colors.light : '#63aee0'},
+                ]}>
+                {error}
+              </Text>
+            </View>
+          ) : null}
+
+          {loading ? (
+            <View style={styles.loading}>
+              <ActivityIndicator size="small" color={accent} />
+              <Text
+                style={[
+                  styles.loadingText,
+                  {color: isDarkMode ? Colors.light : Colors.dark},
+                ]}>
+                Cargando tus datos...
+              </Text>
+            </View>
+          ) : null}
+
+          {tab === 'qr' && (
+            <View style={styles.qrWrapper}>
+              <View
+                style={[
+                  styles.qrCard,
+                  {backgroundColor: isDarkMode ? Colors.black : Colors.white},
+                ]}>
+                <Text
+                  style={[
+                    styles.sectionTitle,
+                    {color: isDarkMode ? Colors.white : Colors.black},
+                  ]}>
+                  Tu código Cookie Pass
+                </Text>
+                <Image
+                  accessibilityLabel="Código QR personal"
+                  source={{uri: getQrUri('cookie-lover')}}
+                  style={styles.qr}
+                />
+                <Text
+                  style={[
+                    styles.qrHint,
+                    {color: isDarkMode ? Colors.light : Colors.dark},
+                  ]}>
+                  Muéstrale este QR al repartidor para sumar un sello.
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {tab === 'card' && (
+            <View
+              style={[
+                styles.progressCard,
+                {backgroundColor: isDarkMode ? Colors.black : Colors.white},
+              ]}>
+              <View style={styles.progressHeader}>
+                <Text
+                  style={[
+                    styles.progressTitle,
+                    {color: isDarkMode ? Colors.white : Colors.black},
+                  ]}>
+                  Tu boleta de sellos
+                </Text>
+                <Text style={[styles.progressCount, {color: accent}]}>
+                  {completedScans}/{totalScans}
+                </Text>
+              </View>
+              <View style={styles.stampsGrid}>
+                {stampItems.map(item => (
+                  <View key={item.id} style={styles.stampSlot}>
+                    {item.filled ? (
+                      <View style={[styles.stampFilled, {backgroundColor: accent}]}>
+                        <Text style={styles.stampEmoji}>🍪</Text>
+                      </View>
+                    ) : (
+                      <View
+                        style={[
+                          styles.stampOutline,
+                          {
+                            borderColor: accent,
+                          },
+                        ]}
+                      />
+                    )}
+                  </View>
+                ))}
+              </View>
+              <View style={styles.rewards}>
+                <Text
+                  style={[
+                    styles.rewardText,
+                    {color: isDarkMode ? Colors.light : Colors.dark},
+                  ]}>
+                  Completa los 8 sellos y obtén 20% de descuento en tu próxima
+                  compra.
+                </Text>
+                <Text
+                  style={[
+                    styles.metaText,
+                    {color: isDarkMode ? Colors.light : Colors.dark},
+                  ]}>
+                  {lastScanLabel
+                    ? `Último escaneo: ${lastScanLabel}`
+                    : 'Aún no registramos sellos en tu cuenta.'}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {tab === 'messages' && (
+            <View
+              style={[
+                styles.messagesCard,
+                {backgroundColor: isDarkMode ? Colors.black : Colors.white},
+              ]}>
+              <Text
+                style={[
+                  styles.messagesTitle,
+                  {color: isDarkMode ? Colors.white : Colors.black},
+                ]}>
+                Mensajes
+              </Text>
+              {messages.length === 0 ? (
+                <Text
+                  style={[
+                    styles.messagesText,
+                    {color: isDarkMode ? Colors.light : Colors.dark},
+                  ]}>
+                  Aquí verás avisos y promociones especiales cuando estén
+                  disponibles.
+                </Text>
+              ) : (
+                <View style={styles.messagesList}>
+                  {messages.map(message => {
+                    const createdLabel = formatDate(message.createdAt);
+                    return (
+                      <View key={message.id} style={styles.messageItem}>
+                        <Text
+                          style={[
+                            styles.messageTitle,
+                            {color: isDarkMode ? Colors.white : Colors.black},
+                          ]}>
+                          {message.title}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.messageBody,
+                            {color: isDarkMode ? Colors.light : Colors.dark},
+                          ]}>
+                          {message.body}
+                        </Text>
+                        {createdLabel ? (
+                          <Text
+                            style={[
+                              styles.messageMeta,
+                              {color: isDarkMode ? Colors.light : Colors.dark},
+                            ]}>
+                            {createdLabel}
+                          </Text>
+                        ) : null}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+
+        <View
+          style={[
+            styles.menu,
+            {backgroundColor: isDarkMode ? Colors.black : Colors.white},
+          ]}>
+          {[
+            {id: 'qr' as const, label: 'QR Code', icon: qrIconUri},
+            {id: 'card' as const, label: 'Card', icon: cardIconUri},
+            {id: 'messages' as const, label: 'Messages', icon: chatIconUri},
+          ].map(item => {
+            const isActive = tab === item.id;
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => setTab(item.id)}
+                style={[
+                  styles.menuButton,
+                  {
+                    backgroundColor: isActive ? accent : 'transparent',
+                  },
+                ]}>
+                <Image
+                  source={{uri: item.icon}}
+                  style={[
+                    styles.menuIcon,
+                    {tintColor: isActive ? '#ffffff' : accent},
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.menuLabel,
+                    {color: isActive ? '#ffffff' : accent},
+                  ]}>
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <SettingsSheet
+          visible={settingsVisible}
+          onClose={() => setSettingsVisible(false)}
+          onSelect={optionId => {
+            Alert.alert('Acción seleccionada', optionId);
+            setSettingsVisible(false);
+          }}
+        />
+        </SafeAreaView>
+      </View>
     </SafeAreaProvider>
   );
 }
 
-type PaletteProps = { palette: Palette };
-
-function HeroSection({ palette }: PaletteProps) {
-  return (
-    <View style={[styles.heroCard, { backgroundColor: palette.cardPrimary, shadowColor: palette.shadow }]}>
-      <Text style={[styles.taglineOverline, { color: palette.textMuted }]}>COOKIEBOO</Text>
-      <Text style={[styles.heroTitle, { color: palette.textPrimary }]}>
-        Galletas artesanales para cada antojo del día.
-      </Text>
-      <Text style={[styles.heroSubtitle, { color: palette.textMuted }]}>
-        Planifica tus drops, recoge en el atelier o agenda delivery frío a tu ciudad.
-      </Text>
-      <View style={styles.heroTags}>
-        {['Same-day pickup', 'Ingredientes locales', 'Latte pairings'].map(tag => (
-          <View
-            key={tag}
-            style={[styles.tagPill, { backgroundColor: palette.accentMuted, borderColor: palette.border }]}
-          >
-            <Text style={[styles.tagPillText, { color: palette.textPrimary }]}>{tag}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function StatsSection({ palette }: PaletteProps) {
-  return (
-    <View style={styles.section}>
-      <SectionHeader
-        palette={palette}
-        title="Pulso del obrador"
-        subtitle="Actualizado en tiempo real por la brigada CookieBoo."
-      />
-      <View style={styles.statGrid}>
-        {kitchenStats.map(stat => (
-          <View
-            key={stat.id}
-            style={[
-              styles.statCard,
-              { backgroundColor: palette.cardSecondary, borderColor: palette.border, shadowColor: palette.shadow },
-            ]}
-          >
-            <Text style={[styles.statValue, { color: palette.textPrimary }]}>{stat.value}</Text>
-            <Text style={[styles.statLabel, { color: palette.textMuted }]}>{stat.label}</Text>
-            <Text style={[styles.statDetail, { color: palette.textPrimary }]}>{stat.detail}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function FeaturedCookiesSection({ palette }: PaletteProps) {
-  return (
-    <View style={styles.section}>
-      <SectionHeader
-        palette={palette}
-        title="Sabores en vitrina"
-        subtitle="Drops calientitos listos para pedir."
-      />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.cookieCarousel}
-      >
-        {featuredCookies.map(cookie => (
-          <View
-            key={cookie.id}
-            style={[styles.cookieCard, { backgroundColor: palette.cardSecondary, borderColor: palette.border }]}
-          >
-            <View style={[styles.cookieBadge, { backgroundColor: palette.highlight }]}>
-              <Text style={styles.cookieBadgeText}>{cookie.badge}</Text>
-            </View>
-            <Text style={styles.cookieIcon}>{cookie.icon}</Text>
-            <Text style={[styles.cookieName, { color: palette.textPrimary }]}>{cookie.name}</Text>
-            <Text style={[styles.cookieTagline, { color: palette.textMuted }]}>{cookie.tagline}</Text>
-            <View style={styles.cookieFoot}>
-              <Text style={[styles.cookieDetail, { color: palette.textPrimary }]}>{cookie.detail}</Text>
-              <Text style={[styles.cookieRating, { color: palette.accent }]}>{cookie.rating}★</Text>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
-
-function KitchenTimelineSection({ palette }: PaletteProps) {
-  return (
-    <View style={styles.section}>
-      <SectionHeader
-        palette={palette}
-        title="Agenda del día"
-        subtitle="Así se hornea la magia CookieBoo."
-      />
-      <View style={styles.timeline}>
-        {kitchenEvents.map(event => (
-          <View
-            key={event.id}
-            style={[styles.timelineItem, { borderColor: palette.border, backgroundColor: palette.cardSecondary }]}
-          >
-            <View style={[styles.timelineDot, { backgroundColor: palette.accent }]} />
-            <View style={styles.timelineCopy}>
-              <Text style={[styles.timelineTime, { color: palette.accent }]}>{event.time}</Text>
-              <Text style={[styles.timelineTitle, { color: palette.textPrimary }]}>{event.title}</Text>
-              <Text style={[styles.timelineDetail, { color: palette.textMuted }]}>{event.detail}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function MembershipSection({ palette }: PaletteProps) {
-  return (
-    <View style={styles.section}>
-      <SectionHeader
-        palette={palette}
-        title="Club CookieBoo"
-        subtitle="Experiencias de suscripción pensadas para cookie lovers."
-      />
-      {memberships.map(plan => (
-        <View
-          key={plan.id}
-          style={[styles.membershipCard, { backgroundColor: palette.cardSecondary, borderColor: palette.border }]}
-        >
-          <Text style={[styles.membershipTitle, { color: palette.textPrimary }]}>{plan.title}</Text>
-          <Text style={[styles.membershipDetail, { color: palette.textMuted }]}>{plan.detail}</Text>
-          <Text style={[styles.membershipShipping, { color: palette.textPrimary }]}>{plan.shipping}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function CTASection({ palette }: PaletteProps) {
-  return (
-    <TouchableOpacity activeOpacity={0.88} style={[styles.ctaButton, { backgroundColor: palette.accent }]}>
-      <Text style={styles.ctaText}>Programa tu CookieBoo Drop</Text>
-      <Text style={styles.ctaSubText}>Elige sabores, agenda horarios y comparte el enlace con tu comunidad.</Text>
-    </TouchableOpacity>
-  );
-}
-
-type SectionHeaderProps = {
-  palette: Palette;
-  title: string;
-  subtitle?: string;
+type SettingsSheetProps = {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (id: string) => void;
 };
 
-function SectionHeader({ palette, title, subtitle }: SectionHeaderProps) {
+function SettingsSheet({visible, onClose, onSelect}: SettingsSheetProps) {
   return (
-    <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionTitle, { color: palette.textPrimary }]}>{title}</Text>
-      {subtitle ? <Text style={[styles.sectionSubtitle, { color: palette.textMuted }]}>{subtitle}</Text> : null}
-    </View>
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+      <View style={styles.sheetOverlay}>
+        <Pressable style={styles.sheetBackdrop} onPress={onClose} />
+        <View style={styles.sheetPanel}>
+          <Text style={styles.sheetTitle}>Configuración</Text>
+          {settingsOptions.map(option => (
+            <Pressable
+              key={option.id}
+              onPress={() => onSelect(option.id)}
+              style={styles.sheetOption}>
+              <View style={styles.sheetOptionIcon}>
+                <Image
+                  source={{uri: option.icon}}
+                  style={styles.sheetOptionIconImage}
+                />
+              </View>
+              <Text style={styles.sheetOptionLabel}>{option.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  background: {
     flex: 1,
   },
-  scrollContent: {
-    padding: 24,
-    gap: 24,
+  screen: {
+    flex: 1,
+    paddingTop: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 120,
   },
-  section: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 28,
+  },
+  profile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+  },
+  profileInfo: {
+    marginLeft: 12,
+  },
+  username: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  tier: {
+    fontSize: 14,
+    opacity: 0.8,
+  },
+  settingsButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  settingsIcon: {
+    width: 22,
+    height: 22,
+  },
+  content: {
+    flex: 1,
     gap: 16,
   },
-  heroCard: {
-    padding: 24,
-    borderRadius: 28,
-    gap: 12,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.25,
-    shadowRadius: 24,
-    elevation: 4,
+  qrWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  taglineOverline: {
-    fontSize: 13,
-    letterSpacing: 2,
-  },
-  heroTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    lineHeight: 36,
-  },
-  heroSubtitle: {
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  heroTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  loading: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
     gap: 8,
-    marginTop: 8,
   },
-  tagPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
+  loadingText: {
+    fontSize: 14,
   },
-  tagPillText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  sectionHeader: {
-    gap: 4,
+  qrCard: {
+    alignItems: 'center',
+    borderRadius: 28,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  sectionSubtitle: {
-    fontSize: 15,
-  },
-  statGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  statCard: {
-    flexBasis: '30%',
-    flexGrow: 1,
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  statLabel: {
-    marginTop: 6,
-    fontSize: 13,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  statDetail: {
-    marginTop: 4,
-    fontSize: 14,
-  },
-  cookieCarousel: {
-    paddingVertical: 6,
-    gap: 12,
-  },
-  cookieCard: {
-    width: 240,
-    padding: 20,
-    borderRadius: 24,
-    borderWidth: 1,
-    gap: 10,
-  },
-  cookieBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  cookieBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  cookieIcon: {
-    fontSize: 42,
-  },
-  cookieName: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  cookieTagline: {
-    fontSize: 15,
-  },
-  cookieFoot: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginTop: 12,
-  },
-  cookieDetail: {
-    flex: 1,
-    fontSize: 13,
-    marginRight: 12,
-  },
-  cookieRating: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  timeline: {
-    gap: 12,
-  },
-  timelineItem: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 16,
-    gap: 16,
-  },
-  timelineDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginTop: 6,
-  },
-  timelineCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  timelineTime: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  timelineTitle: {
     fontSize: 18,
     fontWeight: '600',
+    marginBottom: 16,
   },
-  timelineDetail: {
+  qr: {
+    width: 230,
+    height: 230,
+    borderRadius: 18,
+  },
+  qrHint: {
+    marginTop: 16,
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  progressCard: {
+    marginTop: 24,
+    borderRadius: 24,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  progressTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  progressCount: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  stampsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  stampSlot: {
+    width: '22%',
+    aspectRatio: 1,
+  },
+  stampOutline: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+  },
+  stampFilled: {
+    flex: 1,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stampEmoji: {
+    fontSize: 18,
+  },
+  rewards: {
+    marginTop: 20,
+  },
+  rewardText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  metaText: {
+    marginTop: 6,
+    fontSize: 13,
+    opacity: 0.7,
+  },
+  errorBox: {
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#fca5a5',
+  },
+  errorText: {
     fontSize: 14,
-    lineHeight: 20,
+    fontWeight: '600',
   },
-  membershipCard: {
-    borderRadius: 22,
-    padding: 20,
-    borderWidth: 1,
+  messagesCard: {
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  messagesTitle: {
+    fontSize: 18,
+    fontWeight: '700',
     marginBottom: 12,
   },
-  membershipTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  membershipDetail: {
+  messagesText: {
     fontSize: 15,
-    marginTop: 6,
+    lineHeight: 22,
   },
-  membershipShipping: {
-    fontSize: 13,
-    marginTop: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+  messagesList: {
+    gap: 16,
   },
-  ctaButton: {
-    borderRadius: 26,
-    padding: 24,
+  messageItem: {
+    borderRadius: 18,
+    padding: 16,
+    backgroundColor: 'rgba(72, 184, 236, 0.08)',
+  },
+  messageTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  messageBody: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+  messageMeta: {
+    fontSize: 12,
+    opacity: 0.7,
+  },
+  menu: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderRadius: 28,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  menuButton: {
+    flex: 1,
+    marginHorizontal: 6,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
     gap: 6,
   },
-  ctaText: {
-    color: '#1B0D05',
+  menuIcon: {
+    width: 20,
+    height: 20,
+  },
+  menuLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sheetOverlay: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  sheetBackdrop: {
+    flex: 1,
+  },
+  sheetPanel: {
+    width: '70%',
+    maxWidth: 320,
+    backgroundColor: '#ffffff',
+    paddingTop: 72,
+    paddingBottom: 32,
+    paddingHorizontal: 20,
+    borderTopLeftRadius: 28,
+    borderBottomLeftRadius: 28,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: {width: -4, height: 0},
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  sheetTitle: {
     fontSize: 20,
     fontWeight: '700',
-    textAlign: 'center',
+    color: '#1f2933',
+    marginBottom: 10,
   },
-  ctaSubText: {
-    color: '#1B0D05',
-    fontSize: 14,
-    textAlign: 'center',
+  sheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 18,
+    gap: 12,
+  },
+  sheetOptionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f4f6fb',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetOptionIconImage: {
+    width: 18,
+    height: 18,
+    tintColor: '#1f2933',
+  },
+  sheetOptionLabel: {
+    fontSize: 16,
+    color: '#1f2933',
+    fontWeight: '600',
   },
 });
 
