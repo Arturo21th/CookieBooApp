@@ -13,10 +13,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { signInWithPassword } from '../services/authService';
 
 type LoginScreenProps = {
-  onLoginSuccess: () => void;
+  onNavigateToSignUp: () => void;
+  onNavigateToForgotPassword: () => void;
 };
 
-function LoginScreen({ onLoginSuccess }: LoginScreenProps): React.JSX.Element {
+function LoginScreen({
+  onNavigateToSignUp,
+  onNavigateToForgotPassword,
+}: LoginScreenProps): React.JSX.Element {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
@@ -32,7 +36,6 @@ function LoginScreen({ onLoginSuccess }: LoginScreenProps): React.JSX.Element {
     setError(null);
     try {
       await signInWithPassword({ email, password });
-      onLoginSuccess();
     } catch (err) {
       console.error('Login error', err);
       setError('Correo o contraseña incorrectos.');
@@ -105,18 +108,14 @@ function LoginScreen({ onLoginSuccess }: LoginScreenProps): React.JSX.Element {
             </Pressable>
 
             <Pressable
-              onPress={() =>
-                Alert.alert('Recuperación', 'Funcionalidad en construcción.')
-              }
+              onPress={onNavigateToForgotPassword}
               style={styles.forgotButton}
             >
               <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
             </Pressable>
 
             <Pressable
-              onPress={() =>
-                Alert.alert('Registro', 'Funcionalidad en construcción.')
-              }
+              onPress={onNavigateToSignUp}
               style={styles.secondaryButton}
             >
               <Text style={styles.secondaryText}>

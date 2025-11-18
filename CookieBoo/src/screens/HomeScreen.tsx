@@ -12,6 +12,14 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import {
+  listenToUserMessages,
+  listenToUserProfile,
+  UserMessage,
+  UserProfile,
+} from '../services/firestoreService';
+import AdminStampLookupScreen from './AdminStampLookupScreen';
 
 const Colors = {
   white: '#ffffff',
@@ -45,15 +53,24 @@ const getQrUri = (userId: string) =>
     userId,
   )}`;
 
-const formatDate = (value: Date) =>
-  value.toLocaleDateString(undefined, {
+const formatDate = (value?: Date | null) => {
+  if (!value) {
+    return null;
+  }
+  return value.toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   });
+};
 
-const settingsOptions = [
+const settingsOptions: Array<{
+  id: string;
+  label: string;
+  icon: string;
+  adminOnly?: boolean;
+}> = [
   {
     id: 'update-name',
     label: 'Actualizar tu nombre',
@@ -70,6 +87,12 @@ const settingsOptions = [
     icon: 'https://img.icons8.com/ios-filled/50/000000/help.png',
   },
   {
+    id: 'admin-stamps',
+    label: 'Consultar sellos',
+    icon: 'https://img.icons8.com/ios-filled/50/1f2933/stamp.png',
+    adminOnly: true,
+  },
+  {
     id: 'logout',
     label: 'Cerrar sesión',
     icon: 'https://img.icons8.com/ios-filled/50/000000/exit.png',
@@ -81,22 +104,132 @@ const settingsOptions = [
   },
 ];
 
-function HomeScreen(): React.JSX.Element {
+type HomeScreenProps = {
+  user: FirebaseAuthTypes.User;
+};
+
+function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
   const accent = isDarkMode ? Colors.light : '#63aee0';
   const [tab, setTab] = React.useState<'qr' | 'card' | 'messages'>('qr');
   const [settingsVisible, setSettingsVisible] = React.useState(false);
-  const [loading] = React.useState(false);
-  const [error] = React.useState<string | null>(null);
+  const [adminView, setAdminView] = React.useState<'stamps' | null>(null);
+  const [profile, setProfile] = React.useState<UserProfile | null>(null);
+  const [messages, setMessages] = React.useState<UserMessage[]>([]);
+  const [loadingProfile, setLoadingProfile] = React.useState(true);
+  const [loadingMessages, setLoadingMessages] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setLoadingProfile(true);
+    const unsubscribe = listenToUserProfile(
+      user.uid,
+      (nextProfile: UserProfile | null) => {
+        setProfile(nextProfile);
+        setLoadingProfile(false);
+        if (!nextProfile) {
+          setError('No pudimos encontrar tu Cookie Pass.');
+        } else {
+          setError(null);
+        }
+      },
+      (err: Error) => {
+        setError('Hubo un problema al cargar tu Cookie Pass.');
+        console.error('listenToUserProfile', err);
+        setLoadingProfile(false);
+      },
+    );
+
+    return unsubscribe;
+  }, [user.uid]);
+
+  React.useEffect(() => {
+    auth()
+      .currentUser?.getIdTokenResult(true)
+      .then(result => {
+        console.log('claims', result.claims);
+      })
+      .catch(err => {
+        console.error('claims error', err);
+      });
+  }, []);
+
+  React.useEffect(() => {
+    setLoadingMessages(true);
+    const unsubscribe = listenToUserMessages(
+      user.uid,
+      10,
+      (nextMessages: UserMessage[]) => {
+        setMessages(nextMessages);
+        setLoadingMessages(false);
+      },
+      (err: Error) => {
+        console.error('listenToUserMessages', err);
+        setLoadingMessages(false);
+      },
+    );
+
+    return unsubscribe;
+  }, [user.uid]);
+
+  const totalScans = profile?.stampsGoal ?? defaultProfile.totalScans;
+  const completedScans = Math.min(
+    profile?.stampsCompleted ?? defaultProfile.completedScans,
+    totalScans,
+  );
   const stampItems = React.useMemo(
     () =>
-      Array.from({ length: defaultProfile.totalScans }, (_, index) => ({
+      Array.from({ length: totalScans }, (_, index) => ({
         id: index,
-        filled: index < defaultProfile.completedScans,
+        filled: index < completedScans,
       })),
+    [totalScans, completedScans],
+  );
+  const lastScanLabel =
+    formatDate(profile?.lastScanAt) ?? formatDate(new Date()) ?? '';
+  const qrData = profile?.qrCodeData ?? user.uid;
+  const displayName = profile?.displayName ?? user.displayName ?? 'Cookie Lover';
+  const tier = profile?.tier ?? defaultProfile.tier;
+  const loading = loadingProfile;
+
+  const handleSettingsSelect = React.useCallback(
+    async (id: string) => {
+      if (id === 'logout') {
+        try {
+          await auth().signOut();
+        } catch (signOutError) {
+          console.error('signOut error', signOutError);
+          Alert.alert(
+            'Ups',
+            'No pudimos cerrar sesión. Inténtalo de nuevo en un momento.',
+          );
+        }
+        setSettingsVisible(false);
+        return;
+      }
+
+      if (id === 'admin-stamps') {
+        setAdminView('stamps');
+        setSettingsVisible(false);
+        return;
+      }
+
+      Alert.alert('Acción seleccionada', id);
+      setSettingsVisible(false);
+    },
     [],
   );
-  const lastScanLabel = formatDate(new Date());
+
+  if (adminView === 'stamps') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <AdminStampLookupScreen
+          profile={profile}
+          onClose={() => setAdminView(null)}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -119,22 +252,22 @@ function HomeScreen(): React.JSX.Element {
             style={styles.avatar}
           />
           <View style={styles.profileInfo}>
-            <Text
-              style={[
-                styles.username,
-                { color: isDarkMode ? Colors.white : Colors.black },
-              ]}
-            >
-              ¡Hola, Cookie Lover!
-            </Text>
+              <Text
+                style={[
+                  styles.username,
+                  { color: isDarkMode ? Colors.white : Colors.black },
+                ]}
+              >
+                ¡Hola, {displayName}!
+              </Text>
             <Text
               style={[
                 styles.tier,
                 { color: isDarkMode ? Colors.light : Colors.dark },
               ]}
             >
-              {defaultProfile.tier}
-            </Text>
+                {tier}
+              </Text>
           </View>
         </View>
         <Pressable
@@ -200,7 +333,7 @@ function HomeScreen(): React.JSX.Element {
               </Text>
               <Image
                 accessibilityLabel="Código QR personal"
-                source={{ uri: getQrUri('cookie-lover') }}
+                source={{ uri: getQrUri(qrData) }}
                 style={styles.qr}
               />
               <Text
@@ -232,7 +365,7 @@ function HomeScreen(): React.JSX.Element {
                 Tu boleta de sellos
               </Text>
               <Text style={[styles.progressCount, { color: accent }]}>
-                {defaultProfile.completedScans}/{defaultProfile.totalScans}
+                {completedScans}/{totalScans}
               </Text>
             </View>
 
@@ -293,14 +426,69 @@ function HomeScreen(): React.JSX.Element {
             >
               Mensajes
             </Text>
-            <Text
-              style={[
-                styles.messagesText,
-                { color: isDarkMode ? Colors.light : Colors.dark },
-              ]}
-            >
-              Aquí verás avisos y promociones especiales cuando estén disponibles.
-            </Text>
+            {loadingMessages ? (
+              <View style={styles.messagesLoading}>
+                <ActivityIndicator size="small" color={accent} />
+                <Text
+                  style={[
+                    styles.loadingText,
+                    { color: isDarkMode ? Colors.light : Colors.dark },
+                  ]}
+                >
+                  Buscando mensajes...
+                </Text>
+              </View>
+            ) : messages.length > 0 ? (
+              <ScrollView contentContainerStyle={styles.messagesList}>
+                {messages.map(message => (
+                  <View
+                    key={message.id}
+                    style={[
+                      styles.messageItem,
+                      {
+                        borderColor: isDarkMode
+                          ? 'rgba(255,255,255,0.2)'
+                          : 'rgba(0,0,0,0.08)',
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.messageTitle,
+                        { color: isDarkMode ? Colors.white : Colors.black },
+                      ]}
+                    >
+                      {message.title}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.messageBody,
+                        { color: isDarkMode ? Colors.light : Colors.dark },
+                      ]}
+                    >
+                      {message.body}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.messageDate,
+                        { color: isDarkMode ? Colors.light : Colors.dark },
+                      ]}
+                    >
+                      {formatDate(message.createdAt) ?? 'Reciente'}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <Text
+                style={[
+                  styles.messagesText,
+                  { color: isDarkMode ? Colors.light : Colors.dark },
+                ]}
+              >
+                Aquí verás avisos y promociones especiales cuando estén disponibles.
+              </Text>
+            )}
           </View>
         )}
       </View>
@@ -351,10 +539,8 @@ function HomeScreen(): React.JSX.Element {
       <SettingsSheet
         visible={settingsVisible}
         onClose={() => setSettingsVisible(false)}
-        onSelect={id => {
-          Alert.alert('Acción seleccionada', id);
-          setSettingsVisible(false);
-        }}
+        onSelect={handleSettingsSelect}
+        showAdminOptions={profile?.role === 'admin'}
       />
       </View>
     </SafeAreaView>
@@ -365,16 +551,24 @@ type SettingsSheetProps = {
   visible: boolean;
   onClose: () => void;
   onSelect: (id: string) => void;
+  showAdminOptions: boolean;
 };
 
-function SettingsSheet({ visible, onClose, onSelect }: SettingsSheetProps) {
+function SettingsSheet({
+  visible,
+  onClose,
+  onSelect,
+  showAdminOptions,
+}: SettingsSheetProps) {
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <View style={styles.sheetOverlay}>
         <Pressable style={styles.sheetBackdrop} onPress={onClose} />
         <View style={styles.sheetPanel}>
           <Text style={styles.sheetTitle}>Configuración</Text>
-          {settingsOptions.map(option => (
+          {settingsOptions
+            .filter(option => (option.adminOnly ? showAdminOptions : true))
+            .map(option => (
             <Pressable
               key={option.id}
               onPress={() => onSelect(option.id)}
@@ -383,7 +577,7 @@ function SettingsSheet({ visible, onClose, onSelect }: SettingsSheetProps) {
               <Image source={{ uri: option.icon }} style={styles.sheetButtonIcon} />
               <Text style={styles.sheetButtonText}>{option.label}</Text>
             </Pressable>
-          ))}
+            ))}
         </View>
       </View>
     </Modal>
@@ -559,6 +753,33 @@ const styles = StyleSheet.create({
   messagesText: {
     fontSize: 15,
     lineHeight: 22,
+  },
+  messagesLoading: {
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+  },
+  messagesList: {
+    marginTop: 8,
+    gap: 12,
+  },
+  messageItem: {
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(0,0,0,0.08)',
+    gap: 4,
+  },
+  messageTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  messageBody: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  messageDate: {
+    fontSize: 12,
+    opacity: 0.7,
   },
   menu: {
     position: 'absolute',
