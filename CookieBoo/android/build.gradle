@@ -6,6 +6,8 @@ buildscript {
         targetSdkVersion = 36
         ndkVersion = "27.1.12297006"
         kotlinVersion = "2.1.20"
+        classpath("com.google.gms:google-services:4.4.2")
+
     }
     repositories {
         google()
@@ -19,3 +21,5 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+apply plugin: "com.google.gms.google-services"
+

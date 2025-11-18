@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "319126374784",
+    "project_id": "cookieboo-7bd68",
+    "storage_bucket": "cookieboo-7bd68.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:319126374784:android:e4514ffeea9ebac204d965",
+        "android_client_info": {
+          "package_name": "com.cookieboo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBb0fsAT5xSQZaLpA_YxIJ8tfAF_gAArhg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
