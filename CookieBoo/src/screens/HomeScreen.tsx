@@ -20,6 +20,8 @@ import {
   UserProfile,
 } from '../services/firestoreService';
 import AdminStampLookupScreen from './AdminStampLookupScreen';
+import AdminRoleManagerScreen from './AdminRoleManagerScreen';
+import AdminBroadcastScreen from './AdminBroadcastScreen';
 
 const Colors = {
   white: '#ffffff',
@@ -93,6 +95,18 @@ const settingsOptions: Array<{
     adminOnly: true,
   },
   {
+    id: 'admin-roles',
+    label: 'Administrar roles',
+    icon: 'https://img.icons8.com/ios-filled/50/1f2933/conference-call.png',
+    adminOnly: true,
+  },
+  {
+    id: 'admin-broadcast',
+    label: 'Enviar mensaje',
+    icon: 'https://img.icons8.com/ios-filled/50/1f2933/paper-plane.png',
+    adminOnly: true,
+  },
+  {
     id: 'logout',
     label: 'Cerrar sesión',
     icon: 'https://img.icons8.com/ios-filled/50/000000/exit.png',
@@ -113,7 +127,9 @@ function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
   const accent = isDarkMode ? Colors.light : '#63aee0';
   const [tab, setTab] = React.useState<'qr' | 'card' | 'messages'>('qr');
   const [settingsVisible, setSettingsVisible] = React.useState(false);
-  const [adminView, setAdminView] = React.useState<'stamps' | null>(null);
+  const [adminView, setAdminView] = React.useState<
+    'stamps' | 'roles' | 'broadcast' | null
+  >(null);
   const [profile, setProfile] = React.useState<UserProfile | null>(null);
   const [messages, setMessages] = React.useState<UserMessage[]>([]);
   const [loadingProfile, setLoadingProfile] = React.useState(true);
@@ -214,6 +230,18 @@ function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
         return;
       }
 
+      if (id === 'admin-roles') {
+        setAdminView('roles');
+        setSettingsVisible(false);
+        return;
+      }
+
+      if (id === 'admin-broadcast') {
+        setAdminView('broadcast');
+        setSettingsVisible(false);
+        return;
+      }
+
       Alert.alert('Acción seleccionada', id);
       setSettingsVisible(false);
     },
@@ -224,6 +252,28 @@ function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
     return (
       <SafeAreaView style={styles.safeArea}>
         <AdminStampLookupScreen
+          profile={profile}
+          onClose={() => setAdminView(null)}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  if (adminView === 'roles') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <AdminRoleManagerScreen
+          profile={profile}
+          onClose={() => setAdminView(null)}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  if (adminView === 'broadcast') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <AdminBroadcastScreen
           profile={profile}
           onClose={() => setAdminView(null)}
         />

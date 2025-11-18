@@ -11,6 +11,7 @@ export type MinimalUser = {
   id: string;
   displayName: string;
   email: string;
+  role?: 'admin' | 'courier' | 'user';
 };
 
 export async function createUserProfile({
@@ -49,6 +50,20 @@ export async function fetchAllUserIds(): Promise<MinimalUser[]> {
       id: doc.id,
       displayName: (data.displayName as string) ?? 'Usuario sin nombre',
       email: (data.email as string) ?? 'Sin correo',
+      role: (data.role as 'admin' | 'courier' | 'user' | undefined) ?? 'user',
     };
+  });
+}
+
+export async function updateUserRole(
+  uid: string,
+  role: 'admin' | 'courier' | 'user',
+) {
+  if (!uid) {
+    throw new Error('Missing uid');
+  }
+  await firestore().collection('users').doc(uid).update({
+    role,
+    updatedAt: firestore.FieldValue.serverTimestamp(),
   });
 }

@@ -151,15 +151,15 @@ function AdminStampLookupScreen({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerRow}>
           <Text style={styles.title}>Consultar sellos</Text>
-          <Text style={styles.subtitle}>
-            Busca por nombre o correo para revisar los sellos acumulados.
-          </Text>
+          <Pressable style={styles.closeButton} onPress={onClose}>
+            <Text style={styles.closeText}>Cerrar</Text>
+          </Pressable>
         </View>
-        <Pressable style={styles.closeButton} onPress={onClose}>
-          <Text style={styles.closeText}>Cerrar</Text>
-        </Pressable>
+        <Text style={styles.subtitle}>
+          Busca por nombre o correo para revisar los sellos acumulados.
+        </Text>
       </View>
       <TextInput
         placeholder="Ej. Ana o ana@email.com"
@@ -230,10 +230,14 @@ const styles = StyleSheet.create({
     paddingTop: 32,
   },
   header: {
+    flexDirection: 'column',
+    gap: 12,
+  },
+  headerRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 16,
+    gap: 12,
   },
   title: {
     fontSize: 26,
