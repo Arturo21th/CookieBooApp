@@ -3,12 +3,12 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  ImageBackground,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  useColorScheme,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,6 +24,7 @@ import AdminRoleManagerScreen from './AdminRoleManagerScreen';
 import AdminBroadcastScreen from './AdminBroadcastScreen';
 import CourierScannerScreen from './CourierScannerScreen';
 import UpdateNameScreen from './UpdateNameScreen';
+import firestore from '@react-native-firebase/firestore';
 
 const Colors = {
   white: '#ffffff',
@@ -40,8 +41,7 @@ const defaultProfile = {
   completedScans: 3,
 };
 
-const logoUri =
-  'https://images.unsplash.com/photo-1517686469429-8bdb88b9f907?auto=format&w=120&q=80';
+const logoImage = require('../../assets/img/Logo_pantalla.png');
 
 const settingsIconUri =
   'https://img.icons8.com/ios-filled/100/ffffff/settings.png';
@@ -51,6 +51,20 @@ const cardIconUri =
   'https://img.icons8.com/ios-filled/100/ffffff/bank-card-back-side.png';
 const chatIconUri =
   'https://img.icons8.com/ios-filled/100/ffffff/filled-chat.png';
+const cardBg = require('../../assets/img/Tarjeta_bg.png');
+const stampIcon = require('../../assets/img/stamp.png');
+const stampPositions: Array<{x: number; y: number}> = [
+  {x: 0.18, y: 0.42},
+  {x: 0.32, y: 0.42},
+  {x: 0.47, y: 0.42},
+  {x: 0.62, y: 0.42},
+  {x: 0.76, y: 0.42},
+  {x: 0.18, y: 0.70},
+  {x: 0.32, y: 0.70},
+  {x: 0.47, y: 0.70},
+  {x: 0.62, y: 0.70},
+  {x: 0.76, y: 0.70},
+];
 
 const getQrUri = (userId: string) =>
   `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(
@@ -132,7 +146,8 @@ type HomeScreenProps = {
 };
 
 function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+  // For now force light mode across the app
+  const isDarkMode = false;
   const accent = isDarkMode ? Colors.light : '#63aee0';
   const [tab, setTab] = React.useState<'qr' | 'card' | 'messages'>('qr');
   const [settingsVisible, setSettingsVisible] = React.useState(false);
@@ -144,6 +159,11 @@ function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
   const [loadingProfile, setLoadingProfile] = React.useState(true);
   const [loadingMessages, setLoadingMessages] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [boardSize, setBoardSize] = React.useState({ width: 0, height: 0 });
+  const [lastRewardShown, setLastRewardShown] = React.useState<number | null>(null);
+  const [rewardMessage, setRewardMessage] = React.useState<string | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
+  const [resettingPassword, setResettingPassword] = React.useState(false);
 
   React.useEffect(() => {
     setLoadingProfile(true);
@@ -217,6 +237,25 @@ function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
   const tier = profile?.tier ?? defaultProfile.tier;
   const loading = loadingProfile;
 
+  React.useEffect(() => {
+    // Mostrar aviso cuando llega a 5 o 10 sellos
+    const milestones: Array<{ value: number; message: string }> = [
+      { value: 5, message: '¡Tienes un 25% de descuento!' },
+      { value: 10, message: '¡Tienes un 50% de descuento!' },
+    ];
+
+    const hit = milestones.find(m => completedScans === m.value);
+    if (hit && lastRewardShown !== hit.value) {
+      setRewardMessage(hit.message);
+      setLastRewardShown(hit.value);
+    }
+
+    if (completedScans < 5 && lastRewardShown !== null) {
+      setLastRewardShown(null);
+      setRewardMessage(null);
+    }
+  }, [completedScans, lastRewardShown]);
+
   const handleSettingsSelect = React.useCallback(
     async (id: string) => {
       if (id === 'logout') {
@@ -263,10 +302,77 @@ function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
         return;
       }
 
+      if (id === 'change-password') {
+        if (!user.email) {
+          Alert.alert(
+            'Correo no disponible',
+            'No encontramos tu correo. Vuelve a iniciar sesión e inténtalo otra vez.',
+          );
+          setSettingsVisible(false);
+          return;
+        }
+        if (resettingPassword) {
+          return;
+        }
+        setResettingPassword(true);
+        try {
+          await auth().sendPasswordResetEmail(user.email);
+          Alert.alert(
+            'Revisa tu correo',
+            'Te enviamos un enlace para que cambies tu contraseña.',
+          );
+        } catch (err) {
+          console.error('password reset error', err);
+          Alert.alert(
+            'No se pudo enviar',
+            'Inténtalo nuevamente o verifica tu conexión.',
+          );
+        } finally {
+          setResettingPassword(false);
+          setSettingsVisible(false);
+        }
+        return;
+      }
+
+      if (id === 'delete-account') {
+        Alert.alert(
+          'Eliminar cuenta',
+          '¿Seguro que quieres eliminar tu cuenta? Esta acción no se puede deshacer.',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: 'Eliminar',
+              style: 'destructive',
+              onPress: async () => {
+                if (deleting) {
+                  return;
+                }
+                setDeleting(true);
+                try {
+                  const uid = user.uid;
+                  await firestore().collection('users').doc(uid).delete().catch(() => {});
+                  await auth().currentUser?.delete();
+                } catch (err) {
+                  console.error('delete account error', err);
+                  Alert.alert(
+                    'No pudimos eliminar tu cuenta',
+                    'Inténtalo de nuevo. Puede que necesites volver a iniciar sesión para confirmar.',
+                  );
+                } finally {
+                  setDeleting(false);
+                }
+              },
+            },
+          ],
+        );
+        setSettingsVisible(false);
+        return;
+      }
+
       Alert.alert('Acción seleccionada', id);
       setSettingsVisible(false);
     },
-    [],
+    [deleting, user.uid],
   );
 
   if (adminView === 'update-name') {
@@ -343,7 +449,7 @@ function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
         <View style={styles.profile}>
           <Image
             accessibilityLabel="Avatar CookieBoo"
-            source={{ uri: logoUri }}
+            source={logoImage}
             style={styles.avatar}
           />
           <View style={styles.profileInfo}>
@@ -444,66 +550,76 @@ function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
         )}
 
         {tab === 'card' && (
-          <View
-            style={[
-              styles.progressCard,
-              { backgroundColor: isDarkMode ? Colors.black : Colors.white },
-            ]}
-          >
-            <View style={styles.progressHeader}>
-              <Text
-                style={[
-                  styles.progressTitle,
-                  { color: isDarkMode ? Colors.white : Colors.black },
-                ]}
-              >
-                Tu boleta de sellos
-              </Text>
-              <Text style={[styles.progressCount, { color: accent }]}>
+          <>
+            <ImageBackground
+              source={cardBg}
+              style={styles.stampBoardBg}
+              imageStyle={styles.cardImage}
+              onLayout={event => {
+                const {width, height} = event.nativeEvent.layout;
+                setBoardSize({width, height});
+              }}>
+              <View style={styles.boardContent}>
+              <View style={styles.stampLayer}>
+                {stampItems.map((item, index) => {
+                  const pos = stampPositions[index] ?? {x: 0, y: 0};
+                  const isTransparentStamp = index === 4 || index === 9;
+                  const sizePx =
+                    boardSize.width > 0 ? boardSize.width * 0.13 : 70;
+                  const leftPx = pos.x * boardSize.width - sizePx / 2;
+                  const topPx = pos.y * boardSize.height - sizePx / 2;
+                  return (
+                    <View
+                      key={item.id}
+                      style={[
+                        styles.stampSlot,
+                        {
+                          width: sizePx,
+                          height: sizePx,
+                          left: leftPx,
+                          top: topPx,
+                          borderRadius: sizePx / 2,
+                        },
+                      ]}>
+                      {item.filled ? (
+                        <Image
+                          source={stampIcon}
+                          style={styles.stampImage}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.stampOutline,
+                            {
+                              borderColor: isTransparentStamp
+                                ? 'transparent'
+                                : accent,
+                              backgroundColor: isTransparentStamp
+                                ? 'transparent'
+                                : 'rgba(255,255,255,0.92)',
+                            },
+                          ]}
+                        />
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </ImageBackground>
+            <View style={styles.progressFooter}>
+              <Text style={styles.progressTitle}>Progreso</Text>
+              <Text style={styles.progressCount}>
                 {completedScans}/{totalScans}
               </Text>
             </View>
-
-            <View style={styles.stampsGrid}>
-              {stampItems.map(item => (
-                <View key={item.id} style={styles.stampSlot}>
-                  {item.filled ? (
-                    <View style={[styles.stampFilled, { backgroundColor: accent }]}>
-                      <Text style={styles.stampEmoji}>🍪</Text>
-                    </View>
-                  ) : (
-                    <View
-                      style={[
-                        styles.stampOutline,
-                        {
-                          borderColor: accent,
-                        },
-                      ]}
-                    />
-                  )}
-                </View>
-              ))}
-            </View>
-
-            <View style={styles.rewards}>
-              <Text
-                style={[
-                  styles.rewardText,
-                  { color: isDarkMode ? Colors.light : Colors.dark },
-                ]}
-              >
-                Completa los 8 sellos y obtén 20% de descuento en tu próxima compra.
-              </Text>
-              <Text
-                style={[
-                  styles.metaText,
-                  { color: isDarkMode ? Colors.light : Colors.dark },
-                ]}
-              >
-                {lastScanLabel}
-              </Text>
-            </View>
-          </View>
+            {rewardMessage ? (
+              <View style={styles.rewardBanner}>
+                <Text style={styles.rewardBannerText}>{rewardMessage}</Text>
+              </View>
+            ) : null}
+          </>
         )}
 
         {tab === 'messages' && (
@@ -668,14 +784,21 @@ function SettingsSheet({ visible, onClose, onSelect, role }: SettingsSheetProps)
               return true;
             })
             .map(option => (
-            <Pressable
-              key={option.id}
-              onPress={() => onSelect(option.id)}
-              style={styles.sheetButton}
-            >
-              <Image source={{ uri: option.icon }} style={styles.sheetButtonIcon} />
-              <Text style={styles.sheetButtonText}>{option.label}</Text>
-            </Pressable>
+              <Pressable
+                key={option.id}
+                onPress={() => onSelect(option.id)}
+                style={styles.sheetButton}
+              >
+                <Image source={{ uri: option.icon }} style={styles.sheetButtonIcon} />
+                <Text
+                  style={[
+                    styles.sheetButtonText,
+                    option.id === 'delete-account' ? styles.dangerText : null,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
             ))}
         </View>
       </View>
@@ -704,9 +827,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
+    width: 72,
+    height: 72,
+    borderRadius: 18,
   },
   profileInfo: {
     marginLeft: 12,
@@ -774,15 +897,33 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
   },
-  progressCard: {
+  stampBoardBg: {
+    width: '100%',
+    aspectRatio: 1181 / 675,
     borderRadius: 24,
-    paddingVertical: 20,
-    paddingHorizontal: 24,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 14,
     elevation: 4,
+  },
+  cardImage: {
+    borderRadius: 24,
+    opacity: 1,
+  },
+  boardContent: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 14,
+    alignItems: 'stretch',
+  },
+  progressHeaderCompact: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   progressHeader: {
     flexDirection: 'row',
@@ -798,30 +939,66 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
-  stampsGrid: {
+  progressFooter: {
+    marginTop: 8,
+    paddingVertical: 8,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
     justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  rewardBanner: {
+    marginTop: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#fef3c7',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#f59e0b',
+    alignItems: 'center',
+  },
+  rewardBannerText: {
+    color: '#92400e',
+    fontWeight: '700',
+  },
+  stampLayer: {
+    flex: 1,
+    position: 'relative',
+    width: '100%',
+    height: '100%',
   },
   stampSlot: {
-    width: '22%',
-    aspectRatio: 1,
-  },
-  stampOutline: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-  },
-  stampFilled: {
-    flex: 1,
-    borderRadius: 12,
+    position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  stampOutline: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 999,
+    borderWidth: 3,
+    borderStyle: 'solid',
+    backgroundColor: 'rgba(255,255,255,0.92)',
+  },
+  stampFilled: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
+  },
   stampEmoji: {
     fontSize: 18,
+  },
+  stampImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 999,
   },
   rewards: {
     marginTop: 20,
@@ -970,6 +1147,9 @@ const styles = StyleSheet.create({
     color: '#1f2933',
     fontSize: 16,
     fontWeight: '600',
+  },
+  dangerText: {
+    color: '#b91c1c',
   },
 });
 
