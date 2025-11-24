@@ -20,7 +20,7 @@ export type UserMessage = {
 
 type ListenerErrorCallback = (error: Error) => void;
 
-const DEFAULT_GOAL = 8;
+const DEFAULT_GOAL = 10;
 
 function toDate(value?: unknown): Date | null {
   if (!value) {

@@ -1,4 +1,5 @@
 import firestore from '@react-native-firebase/firestore';
+import auth from '@react-native-firebase/auth';
 
 type CreateUserProfilePayload = {
   uid: string;
@@ -28,7 +29,7 @@ export async function createUserProfile({
       email,
       role,
       tier: 'Cliente Cookie Lover',
-      stampsGoal: 8,
+      stampsGoal: 10,
       stampsCompleted: 0,
       qrCodeData: uid,
       lastScanAt: null,
@@ -66,4 +67,24 @@ export async function updateUserRole(
     role,
     updatedAt: firestore.FieldValue.serverTimestamp(),
   });
+}
+
+export async function updateDisplayName(uid: string, displayName: string) {
+  const trimmedName = displayName.trim();
+  if (!uid || !trimmedName) {
+    throw new Error('Missing uid or display name');
+  }
+  const now = firestore.FieldValue.serverTimestamp();
+  await firestore().collection('users').doc(uid).set(
+    {
+      displayName: trimmedName,
+      updatedAt: now,
+    },
+    {merge: true},
+  );
+
+  const currentUser = auth().currentUser;
+  if (currentUser && currentUser.uid === uid) {
+    await currentUser.updateProfile({displayName: trimmedName});
+  }
 }

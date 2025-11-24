@@ -177,7 +177,7 @@ function AdminStampLookupScreen({
           const stampState = stampMap[item.id];
           const isLoadingStamp = !stampState || stampState.loading;
           const completed = stampState?.card?.completedScans ?? 0;
-          const total = stampState?.card?.totalScans ?? 8;
+          const total = stampState?.card?.totalScans ?? 10;
           return (
             <View style={styles.card}>
               <View>

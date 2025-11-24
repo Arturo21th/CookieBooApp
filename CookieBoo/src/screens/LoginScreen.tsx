@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -79,14 +80,15 @@ function LoginScreen({
                 onPress={() => setShowPassword(prev => !prev)}
                 style={styles.eyeButton}
               >
-                <Text
+                <Image
+                  source={{
+                    uri: 'https://img.icons8.com/ios-filled/50/000000/visible.png',
+                  }}
                   style={[
-                    styles.eyeText,
-                    showPassword ? styles.eyeTextActive : styles.eyeTextInactive,
+                    styles.eyeIcon,
+                    { tintColor: showPassword ? '#000000' : 'rgba(0,0,0,0.45)' },
                   ]}
-                >
-                  👁
-                </Text>
+                />
               </Pressable>
             </View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -175,14 +177,9 @@ const styles = StyleSheet.create({
     right: 12,
     padding: 8,
   },
-  eyeText: {
-    fontSize: 18,
-  },
-  eyeTextInactive: {
-    color: 'rgba(0,0,0,0.45)',
-  },
-  eyeTextActive: {
-    color: '#000000',
+  eyeIcon: {
+    width: 22,
+    height: 22,
   },
   error: {
     color: '#b91c1c',

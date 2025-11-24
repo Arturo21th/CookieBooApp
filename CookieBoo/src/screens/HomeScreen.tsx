@@ -23,6 +23,7 @@ import AdminStampLookupScreen from './AdminStampLookupScreen';
 import AdminRoleManagerScreen from './AdminRoleManagerScreen';
 import AdminBroadcastScreen from './AdminBroadcastScreen';
 import CourierScannerScreen from './CourierScannerScreen';
+import UpdateNameScreen from './UpdateNameScreen';
 
 const Colors = {
   white: '#ffffff',
@@ -35,7 +36,7 @@ const Colors = {
 
 const defaultProfile = {
   tier: 'Cliente Cookie Lover',
-  totalScans: 8,
+  totalScans: 10,
   completedScans: 3,
 };
 
@@ -136,7 +137,7 @@ function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
   const [tab, setTab] = React.useState<'qr' | 'card' | 'messages'>('qr');
   const [settingsVisible, setSettingsVisible] = React.useState(false);
   const [adminView, setAdminView] = React.useState<
-    'stamps' | 'roles' | 'broadcast' | 'scanner' | null
+    'stamps' | 'roles' | 'broadcast' | 'scanner' | 'update-name' | null
   >(null);
   const [profile, setProfile] = React.useState<UserProfile | null>(null);
   const [messages, setMessages] = React.useState<UserMessage[]>([]);
@@ -256,11 +257,29 @@ function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
         return;
       }
 
+      if (id === 'update-name') {
+        setAdminView('update-name');
+        setSettingsVisible(false);
+        return;
+      }
+
       Alert.alert('Acción seleccionada', id);
       setSettingsVisible(false);
     },
     [],
   );
+
+  if (adminView === 'update-name') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <UpdateNameScreen
+          userId={user.uid}
+          currentName={displayName}
+          onClose={() => setAdminView(null)}
+        />
+      </SafeAreaView>
+    );
+  }
 
   if (adminView === 'stamps') {
     return (

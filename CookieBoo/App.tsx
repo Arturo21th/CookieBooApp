@@ -1,5 +1,12 @@
 import React from 'react';
-import { ActivityIndicator, StatusBar, View, StyleSheet } from 'react-native';
+import {
+  ActivityIndicator,
+  StatusBar,
+  View,
+  StyleSheet,
+  Image,
+  Text,
+} from 'react-native';
 import firebase from '@react-native-firebase/app';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { firebaseOptions } from './src/config/firebaseOptions';
@@ -13,6 +20,8 @@ function App(): React.JSX.Element {
   const [firebaseReady, setFirebaseReady] = React.useState(false);
   const { user, initializing: authLoading } = useFirebaseAuth(firebaseReady);
   const [authScreen, setAuthScreen] = React.useState<'login' | 'signup' | 'forgot'>('login');
+  const [showApp, setShowApp] = React.useState(false);
+  const splashStartRef = React.useRef(Date.now());
 
   React.useEffect(() => {
     async function initialize() {
@@ -33,16 +42,26 @@ function App(): React.JSX.Element {
     }
   }, [user]);
 
+  React.useEffect(() => {
+    if (firebaseReady && !authLoading) {
+      const elapsed = Date.now() - splashStartRef.current;
+      const remaining = Math.max(0, 3000 - elapsed);
+      const timer = setTimeout(() => setShowApp(true), remaining);
+      return () => clearTimeout(timer);
+    }
+  }, [firebaseReady, authLoading]);
+
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       <View style={styles.container}>
-        {firebaseReady && !authLoading ? (
-          user ? (
-            <HomeScreen user={user} />
-          ) : (
-            authScreen === 'login' ? (
-              <LoginScreen
+        {showApp ? (
+          firebaseReady && !authLoading ? (
+            user ? (
+              <HomeScreen user={user} />
+            ) : (
+              authScreen === 'login' ? (
+                <LoginScreen
                 onNavigateToSignUp={() => setAuthScreen('signup')}
                 onNavigateToForgotPassword={() => setAuthScreen('forgot')}
               />
@@ -50,12 +69,13 @@ function App(): React.JSX.Element {
               <SignUpScreen onNavigateToLogin={() => setAuthScreen('login')} />
             ) : (
               <ResetPasswordScreen onNavigateBack={() => setAuthScreen('login')} />
+              )
             )
+          ) : (
+            <SplashScreen />
           )
         ) : (
-          <View style={styles.loading}>
-            <ActivityIndicator size="large" color="#63aee0" />
-          </View>
+          <SplashScreen />
         )}
       </View>
     </SafeAreaProvider>
@@ -70,6 +90,70 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+});
+
+const SplashScreen = () => {
+  let logoSource: number | null = null;
+  try {
+    // Si agregas el archivo en ./assets/images/logo.png, se usará aquí.
+    // De lo contrario, mostramos el monograma de texto como respaldo.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    logoSource = require('./assets/img/Logo_pantalla.png');
+  } catch (err) {
+    logoSource = null;
+  }
+
+  return (
+    <View style={stylesSplash.container}>
+      {logoSource ? (
+        <Image source={logoSource} style={stylesSplash.logoImage} />
+      ) : (
+        <View style={stylesSplash.logo}>
+          <Text style={stylesSplash.logoText}>CB</Text>
+        </View>
+      )}
+      <ActivityIndicator size="large" color="#63aee0" />
+    </View>
+  );
+};
+
+const stylesSplash = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    gap: 16,
+  },
+  logo: {
+    width: 380,
+    height: 380,
+    borderRadius: 190,
+    backgroundColor: '#63aee0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  logoText: {
+    color: '#ffffff',
+    fontSize: 120,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  logoImage: {
+    width: 440,
+    height: 440,
+    resizeMode: 'contain',
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1f2933',
   },
 });
 

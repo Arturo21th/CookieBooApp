@@ -41,7 +41,7 @@ export async function fetchStampCard(userId: string): Promise<StampCard | null> 
   }
 
   const data = doc.data() ?? {};
-  const total = typeof data.stampsGoal === 'number' ? data.stampsGoal : 8;
+  const total = typeof data.stampsGoal === 'number' ? data.stampsGoal : 10;
   const completed =
     typeof data.stampsCompleted === 'number' ? data.stampsCompleted : 0;
 
@@ -75,7 +75,7 @@ export async function recordScan({ userId, scannedBy }: RecordScanPayload) {
     const goal =
       typeof data.stampsGoal === 'number' && data.stampsGoal > 0
         ? data.stampsGoal
-        : 8;
+        : 10;
     const completed =
       typeof data.stampsCompleted === 'number' ? data.stampsCompleted : 0;
     const nextCompleted = Math.min(goal, completed + 1);
