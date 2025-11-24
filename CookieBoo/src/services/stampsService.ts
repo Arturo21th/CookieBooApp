@@ -54,3 +54,36 @@ export async function fetchStampCard(userId: string): Promise<StampCard | null> 
     lastScanAt: toDate(data.lastScanAt),
   };
 }
+
+type RecordScanPayload = {
+  userId: string;
+  scannedBy: string;
+};
+
+export async function recordScan({ userId, scannedBy }: RecordScanPayload) {
+  if (!userId) {
+    throw new Error('Missing userId');
+  }
+  const userRef = firestore().collection('users').doc(userId);
+
+  await firestore().runTransaction(async transaction => {
+    const snapshot = await transaction.get(userRef);
+    if (!snapshot.exists) {
+      throw new Error('Usuario no encontrado');
+    }
+    const data = snapshot.data() ?? {};
+    const goal =
+      typeof data.stampsGoal === 'number' && data.stampsGoal > 0
+        ? data.stampsGoal
+        : 8;
+    const completed =
+      typeof data.stampsCompleted === 'number' ? data.stampsCompleted : 0;
+    const nextCompleted = Math.min(goal, completed + 1);
+
+    transaction.update(userRef, {
+      stampsCompleted: nextCompleted,
+      lastScanAt: firestore.FieldValue.serverTimestamp(),
+      lastScannedBy: scannedBy,
+    });
+  });
+}

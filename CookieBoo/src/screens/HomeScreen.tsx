@@ -22,6 +22,7 @@ import {
 import AdminStampLookupScreen from './AdminStampLookupScreen';
 import AdminRoleManagerScreen from './AdminRoleManagerScreen';
 import AdminBroadcastScreen from './AdminBroadcastScreen';
+import CourierScannerScreen from './CourierScannerScreen';
 
 const Colors = {
   white: '#ffffff',
@@ -72,6 +73,7 @@ const settingsOptions: Array<{
   label: string;
   icon: string;
   adminOnly?: boolean;
+  roles?: Array<'admin' | 'courier' | 'user'>;
 }> = [
   {
     id: 'update-name',
@@ -87,6 +89,12 @@ const settingsOptions: Array<{
     id: 'help',
     label: 'Ayuda',
     icon: 'https://img.icons8.com/ios-filled/50/000000/help.png',
+  },
+  {
+    id: 'courier-scanner',
+    label: 'Escanear QR',
+    icon: 'https://img.icons8.com/ios-filled/50/1f2933/qr-code.png',
+    roles: ['admin', 'courier'],
   },
   {
     id: 'admin-stamps',
@@ -128,7 +136,7 @@ function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
   const [tab, setTab] = React.useState<'qr' | 'card' | 'messages'>('qr');
   const [settingsVisible, setSettingsVisible] = React.useState(false);
   const [adminView, setAdminView] = React.useState<
-    'stamps' | 'roles' | 'broadcast' | null
+    'stamps' | 'roles' | 'broadcast' | 'scanner' | null
   >(null);
   const [profile, setProfile] = React.useState<UserProfile | null>(null);
   const [messages, setMessages] = React.useState<UserMessage[]>([]);
@@ -242,6 +250,12 @@ function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
         return;
       }
 
+      if (id === 'courier-scanner') {
+        setAdminView('scanner');
+        setSettingsVisible(false);
+        return;
+      }
+
       Alert.alert('Acción seleccionada', id);
       setSettingsVisible(false);
     },
@@ -276,6 +290,18 @@ function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
         <AdminBroadcastScreen
           profile={profile}
           onClose={() => setAdminView(null)}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  if (adminView === 'scanner') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <CourierScannerScreen
+          onClose={() => setAdminView(null)}
+          role={profile?.role ?? null}
+          currentUserId={user?.uid ?? null}
         />
       </SafeAreaView>
     );
@@ -590,7 +616,7 @@ function HomeScreen({ user }: HomeScreenProps): React.JSX.Element {
         visible={settingsVisible}
         onClose={() => setSettingsVisible(false)}
         onSelect={handleSettingsSelect}
-        showAdminOptions={profile?.role === 'admin'}
+        role={profile?.role}
       />
       </View>
     </SafeAreaView>
@@ -601,15 +627,10 @@ type SettingsSheetProps = {
   visible: boolean;
   onClose: () => void;
   onSelect: (id: string) => void;
-  showAdminOptions: boolean;
+  role?: string | null;
 };
 
-function SettingsSheet({
-  visible,
-  onClose,
-  onSelect,
-  showAdminOptions,
-}: SettingsSheetProps) {
+function SettingsSheet({ visible, onClose, onSelect, role }: SettingsSheetProps) {
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <View style={styles.sheetOverlay}>
@@ -617,7 +638,16 @@ function SettingsSheet({
         <View style={styles.sheetPanel}>
           <Text style={styles.sheetTitle}>Configuración</Text>
           {settingsOptions
-            .filter(option => (option.adminOnly ? showAdminOptions : true))
+            .filter(option => {
+              const currentRole = role ?? 'user';
+              if (option.adminOnly && currentRole !== 'admin') {
+                return false;
+              }
+              if (option.roles && !option.roles.includes(currentRole as 'admin' | 'courier' | 'user')) {
+                return false;
+              }
+              return true;
+            })
             .map(option => (
             <Pressable
               key={option.id}
